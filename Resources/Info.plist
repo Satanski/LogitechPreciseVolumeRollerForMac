@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.user.LogitechPreciseVolumeRoller</string>
+    <string>com.satanski.LogitechPreciseVolumeRoller</string>
     <key>CFBundleName</key>
     <string>LogitechPreciseVolumeRoller</string>
     <key>CFBundlePackageType</key>
