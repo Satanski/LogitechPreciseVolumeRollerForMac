@@ -7,19 +7,23 @@ import CoreGraphics
 class PreciseVolumeRollerApp: NSObject, NSApplicationDelegate {
     static var delegate: PreciseVolumeRollerApp?
     var controller: VolumeRollerController?
+    var settingsWindowController: SettingsWindowController?
 
     static func main() {
+        AppLogger.log("--- App Starting ---")
         let bundleID = "com.satanski.LogitechPreciseVolumeRoller"
         let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
         
-        // If there is more than 1 instance running, signal it to show its icon and quit this one
+        AppLogger.log("Running instances found: \(runningApps.count)")
+        let isBackground = CommandLine.arguments.contains("--background")
+        
+        // If there is more than 1 instance running, signal it to show its window and quit this one
         if runningApps.count > 1 {
-            let logMsg = "⚠️ Another instance is already running. Signalling to show icon and quitting."
-            print(logMsg)
+            let logMsg = "⚠️ Another instance is already running. Signalling to show window and quitting."
             AppLogger.log(logMsg)
             
             DistributedNotificationCenter.default().postNotificationName(
-                Notification.Name("\(bundleID).ShowIcon"),
+                Notification.Name("\(bundleID).ShowSettings"),
                 object: nil,
                 userInfo: nil,
                 deliverImmediately: true
@@ -31,6 +35,7 @@ class PreciseVolumeRollerApp: NSObject, NSApplicationDelegate {
         let delegate = PreciseVolumeRollerApp()
         self.delegate = delegate
         app.delegate = delegate
+        
         app.run()
     }
 
@@ -38,6 +43,39 @@ class PreciseVolumeRollerApp: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         controller = VolumeRollerController()
         controller?.start()
+        
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(showSettingsNotificationReceived),
+            name: Notification.Name("com.satanski.LogitechPreciseVolumeRoller.ShowSettings"),
+            object: nil
+        )
+
+        // Decide whether to show window on launch
+        let isBackground = CommandLine.arguments.contains("--background")
+        if !isBackground {
+            showSettingsWindow()
+        }
+    }
+    
+    @objc func showSettingsNotificationReceived() {
+        showSettingsWindow()
+    }
+    
+    func showSettingsWindow() {
+        AppLogger.log("Attempting to show settings window...")
+        if settingsWindowController == nil {
+            AppLogger.log("Creating SettingsWindowController...")
+            settingsWindowController = SettingsWindowController()
+        }
+        
+        // Ensure app can take focus to show window
+        AppLogger.log("Setting activation policy to .regular")
+        NSApp.setActivationPolicy(.regular)
+        settingsWindowController?.showWindow(nil)
+        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
+        let success = NSApp.activate(ignoringOtherApps: true)
+        AppLogger.log("App activation successful: \(success)")
     }
 }
 
@@ -66,8 +104,8 @@ class VolumeRollerController {
 
         DistributedNotificationCenter.default().addObserver(
             self,
-            selector: #selector(showIconNotificationReceived),
-            name: Notification.Name("com.satanski.LogitechPreciseVolumeRoller.ShowIcon"),
+            selector: #selector(refreshMenuBarNotification),
+            name: Notification.Name("com.satanski.LogitechPreciseVolumeRoller.RefreshMenuBar"),
             object: nil
         )
 
@@ -76,7 +114,7 @@ class VolumeRollerController {
             ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         )
         if !trusted {
-            AppLogger.log("⚠️  Brak uprawnień Accessibility.")
+            AppLogger.log("⚠️ Brak uprawnień Accessibility.")
             AppLogger.log("   Przejdź do: Ustawienia systemowe → Prywatność i bezpieczeństwo → Dostępność")
             AppLogger.log("   Usuń starą wersję, dodaj nową i uruchom ponownie.")
         } else {
@@ -105,7 +143,11 @@ class VolumeRollerController {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
-        AppLogger.log("🎛️  Nasłuchiwanie aktywne.")
+        AppLogger.log("🎛️ Nasłuchiwanie aktywne.")
+    }
+
+    @objc private func refreshMenuBarNotification() {
+        setupMenuBar()
     }
 
     private func setupMenuBar() {
@@ -142,14 +184,7 @@ class VolumeRollerController {
         menu.addItem(NSMenuItem(title: "Logitech Precise Volume Roller", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         
-        let launchItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-        launchItem.target = self
-        launchItem.state = LaunchAtLoginManager.isEnabled ? .on : .off
-        menu.addItem(launchItem)
-
-        let hideItem = NSMenuItem(title: "Hide Menu Bar Icon", action: #selector(toggleHideIcon), keyEquivalent: "")
-        hideItem.target = self
-        menu.addItem(hideItem)
+        menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
         
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -157,31 +192,13 @@ class VolumeRollerController {
         statusItem?.menu = menu
     }
 
-    @objc private func toggleHideIcon() {
-        let alert = NSAlert()
-        alert.messageText = "Hide Menu Bar Icon?"
-        alert.informativeText = "The icon will be hidden. To show it again, launch the application again from the Applications folder."
-        alert.addButton(withTitle: "Hide")
-        alert.addButton(withTitle: "Cancel")
-        
-        if alert.runModal() == .alertFirstButtonReturn {
-            SettingsManager.isMenuBarIconHidden = true
-            setupMenuBar()
+    @objc private func openSettings() {
+        if let appDelegate = NSApp.delegate as? PreciseVolumeRollerApp {
+            appDelegate.showSettingsWindow()
         }
     }
 
-    @objc private func showIconNotificationReceived() {
-        SettingsManager.isMenuBarIconHidden = false
-        setupMenuBar()
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        LaunchAtLoginManager.isEnabled.toggle()
-        updateMenu()
-    }
-
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        // Obsługa odłączenia tapa (system go wyłącza np. pod obciążeniem)
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             AppLogger.log("⚠️ Event tap disabled (\(type.rawValue)). Re-enabling...")
             if let tap = self.eventTap {
@@ -190,7 +207,6 @@ class VolumeRollerController {
             return Unmanaged.passUnretained(event)
         }
 
-        // NX_SYSDEFINED events: subtype 8 = media keys
         let nsEvent = NSEvent(cgEvent: event)
         guard let ns = nsEvent, ns.subtype.rawValue == 8 else {
             return Unmanaged.passUnretained(event)
@@ -199,13 +215,11 @@ class VolumeRollerController {
         let data1 = ns.data1
         let keyCode = Int32((data1 & 0xFFFF0000) >> 16)
         let keyFlags = (data1 & 0x0000FFFF)
-        let keyState = ((keyFlags & 0xFF00) >> 8)  // 0xa = down, 0xb = up
+        let keyState = ((keyFlags & 0xFF00) >> 8)
         let isDown = (keyState == 0x0a)
 
-        // keyCode: 0 = Sound Up, 1 = Sound Down, 7 = Mute, 16 = Play/Pause
         switch keyCode {
-        case 0, 1:  // Volume Up / Down
-            // Przepuść nasze własne zdarzenia (mają flagi Option+Shift)
+        case 0, 1:
             let flags = event.flags
             if flags.contains(.maskAlternate) && flags.contains(.maskShift) {
                 return Unmanaged.passUnretained(event)
@@ -215,15 +229,12 @@ class VolumeRollerController {
                 let isUp = (keyCode == 0)
                 if processVolumeEvent(isUp: isUp) {
                     simulateMediaKey(keyCode: keyCode, withOptionShift: true)
-                    return nil  // blokujemy oryginalne zdarzenie
+                    return nil
                 }
             }
-            return nil  // blokujemy zarówno key-down jak i key-up
+            return nil
 
-        case 7:  // Mute
-            return Unmanaged.passUnretained(event)
-
-        case 16:  // Play/Pause
+        case 7, 16:
             return Unmanaged.passUnretained(event)
 
         default:
@@ -233,20 +244,12 @@ class VolumeRollerController {
 
     private func processVolumeEvent(isUp: Bool) -> Bool {
         let now = Date().timeIntervalSince1970
+        guard now - lastEventTime > debounceInterval else { return false }
 
-        // Debounce
-        guard now - lastEventTime > debounceInterval else {
-            return false
-        }
-
-        // Filtr kierunku z potwierdzeniem
         if let dir = lastDirection, now - lastDirectionTime < directionLockWindow, dir != isUp {
             pendingNewDirectionCount += 1
-            if pendingNewDirectionCount < directionConfirmCount {
-                return false
-            } else {
-                pendingNewDirectionCount = 0
-            }
+            if pendingNewDirectionCount < directionConfirmCount { return false }
+            pendingNewDirectionCount = 0
         } else if lastDirection != nil {
             pendingNewDirectionCount = 0
         }
@@ -261,7 +264,6 @@ class VolumeRollerController {
 
     private func simulateMediaKey(keyCode: Int32, withOptionShift: Bool = false) {
         let optShiftBits: UInt = withOptionShift ? 0x80000 | 0x20000 : 0
-
         let eventDown = NSEvent.otherEvent(with: .systemDefined,
                                            location: NSPoint.zero,
                                            modifierFlags: NSEvent.ModifierFlags(rawValue: 0xa00 | optShiftBits),
@@ -280,9 +282,74 @@ class VolumeRollerController {
                                          subtype: 8,
                                          data1: Int((keyCode << 16) | (0xb << 8)),
                                          data2: -1)
-        
         eventDown?.cgEvent?.post(tap: .cghidEventTap)
         eventUp?.cgEvent?.post(tap: .cghidEventTap)
+    }
+}
+
+class SettingsWindowController: NSWindowController {
+    convenience init() {
+        let contentRect = NSRect(x: 0, y: 0, width: 320, height: 180)
+        let window = NSWindow(
+            contentRect: contentRect,
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        self.init(window: window)
+        
+        window.title = "Settings"
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.titlebarAppearsTransparent = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.delegate = self
+        
+        let contentView = NSView(frame: contentRect)
+        window.contentView = contentView
+        
+        let titleLabel = NSTextField(labelWithString: "Logitech Precise Volume Roller")
+        titleLabel.font = NSFont.boldSystemFont(ofSize: 14)
+        titleLabel.frame = NSRect(x: 20, y: 130, width: 280, height: 20)
+        contentView.addSubview(titleLabel)
+        
+        let iconCheckbox = NSButton(checkboxWithTitle: "Show icon in menu bar", target: nil, action: #selector(toggleIcon))
+        iconCheckbox.frame = NSRect(x: 20, y: 90, width: 280, height: 20)
+        iconCheckbox.state = SettingsManager.isMenuBarIconHidden ? .off : .on
+        iconCheckbox.target = self
+        contentView.addSubview(iconCheckbox)
+        
+        let launchCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: #selector(toggleLaunch))
+        launchCheckbox.frame = NSRect(x: 20, y: 60, width: 280, height: 20)
+        launchCheckbox.state = LaunchAtLoginManager.isEnabled ? .on : .off
+        launchCheckbox.target = self
+        contentView.addSubview(launchCheckbox)
+        
+        let infoLabel = NSTextField(labelWithString: "The app runs in the background to improve volume control.")
+        infoLabel.font = NSFont.systemFont(ofSize: 11)
+        infoLabel.textColor = .secondaryLabelColor
+        infoLabel.frame = NSRect(x: 20, y: 20, width: 280, height: 30)
+        contentView.addSubview(infoLabel)
+    }
+    
+    @objc func toggleIcon(_ sender: NSButton) {
+        SettingsManager.isMenuBarIconHidden = (sender.state == .off)
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.satanski.LogitechPreciseVolumeRoller.RefreshMenuBar"),
+            object: nil
+        )
+    }
+    
+    @objc func toggleLaunch(_ sender: NSButton) {
+        LaunchAtLoginManager.isEnabled = (sender.state == .on)
+    }
+}
+
+extension SettingsWindowController: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        AppLogger.log("Settings window closing, switching to .accessory")
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 
@@ -291,51 +358,36 @@ class LaunchAtLoginManager {
     static let plistPath = ("~/Library/LaunchAgents/\(label).plist" as NSString).expandingTildeInPath
     
     static var isEnabled: Bool {
-        get {
-            FileManager.default.fileExists(atPath: plistPath)
-        }
-        set {
-            if newValue {
-                enable()
-            } else {
-                disable()
-            }
-        }
+        get { FileManager.default.fileExists(atPath: plistPath) }
+        set { newValue ? enable() : disable() }
     }
     
     private static func enable() {
-        let executablePath: String
-        if Bundle.main.bundlePath.hasSuffix(".app") {
-            executablePath = Bundle.main.executablePath ?? Bundle.main.bundlePath
-        } else {
-            executablePath = Bundle.main.bundlePath
-        }
+        let executablePath = Bundle.main.bundlePath.hasSuffix(".app") 
+            ? (Bundle.main.executablePath ?? Bundle.main.bundlePath)
+            : Bundle.main.bundlePath
         
         let plist: [String: Any] = [
             "Label": label,
-            "ProgramArguments": [executablePath],
+            "ProgramArguments": [executablePath, "--background"],
             "RunAtLoad": true,
             "KeepAlive": false
         ]
         
         let data = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
         try? data?.write(to: URL(fileURLWithPath: plistPath))
-        AppLogger.log("✅ LaunchAgent created at \(plistPath)")
     }
     
     private static func disable() {
         try? FileManager.default.removeItem(atPath: plistPath)
-        AppLogger.log("🗑️ LaunchAgent removed.")
     }
 }
 
 class AppLogger {
     static func log(_ message: String) {
         let logPath = ("~/Library/Logs/PreciseVolumeRoller.log" as NSString).expandingTildeInPath
-        let timestamp = Date().description
-        let logMessage = "[\(timestamp)] \(message)\n"
+        let logMessage = "[\(Date().description)] \(message)\n"
         print(message)
-        
         if let data = logMessage.data(using: .utf8) {
             if FileManager.default.fileExists(atPath: logPath) {
                 if let fileHandle = FileHandle(forWritingAtPath: logPath) {
@@ -349,9 +401,9 @@ class AppLogger {
         }
     }
 }
+
 class SettingsManager {
     static let hideIconKey = "hideMenuBarIcon"
-    
     static var isMenuBarIconHidden: Bool {
         get { UserDefaults.standard.bool(forKey: hideIconKey) }
         set { UserDefaults.standard.set(newValue, forKey: hideIconKey) }

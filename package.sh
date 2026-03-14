@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-APP_NAME="LogitechPreciseVolumeRoller"
+APP_NAME="Logitech Precise Volume Roller"
 BUNDLE_ID="com.satanski.LogitechPreciseVolumeRoller"
 EXECUTABLE_NAME="LogitechPreciseVolumeRollerForMac"
 BUNDLE_DIR="${APP_NAME}.app"
