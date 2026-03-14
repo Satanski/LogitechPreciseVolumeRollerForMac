@@ -2,7 +2,7 @@
 
 # Configuration
 APP_NAME="LogitechPreciseVolumeRoller"
-BUNDLE_ID="com.user.LogitechPreciseVolumeRoller"
+BUNDLE_ID="com.satanski.LogitechPreciseVolumeRoller"
 EXECUTABLE_NAME="LogitechPreciseVolumeRollerForMac"
 BUNDLE_DIR="${APP_NAME}.app"
 
@@ -31,7 +31,14 @@ fi
 
 # Sign the bundle
 echo "✍️  Ad-hoc signing the app bundle..."
-codesign --force --deep -s - "$BUNDLE_DIR"
+codesign --force --deep -s - "$BUNDLE_DIR" || { echo "❌ Signing failed"; exit 1; }
+
+# Create ZIP
+ZIP_NAME="${APP_NAME}.zip"
+echo "📦 Creating ZIP archive: $ZIP_NAME..."
+rm -f "$ZIP_NAME"
+zip -r9 "$ZIP_NAME" "$BUNDLE_DIR" > /dev/null
 
 echo "✅ Done! Application bundled in $BUNDLE_DIR"
-echo "👉 You can now move $BUNDLE_DIR to your /Applications folder."
+echo "📦 Distributable archive created: $ZIP_NAME"
+echo "👉 You can now move $BUNDLE_DIR to your /Applications folder or share $ZIP_NAME."

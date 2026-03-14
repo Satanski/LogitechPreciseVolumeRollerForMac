@@ -9,7 +9,7 @@ class PreciseVolumeRollerApp: NSObject, NSApplicationDelegate {
     var controller: VolumeRollerController?
 
     static func main() {
-        let bundleID = "com.user.LogitechPreciseVolumeRoller"
+        let bundleID = "com.satanski.LogitechPreciseVolumeRoller"
         let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
         
         // If there is more than 1 instance running, signal it to show its icon and quit this one
@@ -67,7 +67,7 @@ class VolumeRollerController {
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(showIconNotificationReceived),
-            name: Notification.Name("com.user.LogitechPreciseVolumeRoller.ShowIcon"),
+            name: Notification.Name("com.satanski.LogitechPreciseVolumeRoller.ShowIcon"),
             object: nil
         )
 
@@ -287,7 +287,7 @@ class VolumeRollerController {
 }
 
 class LaunchAtLoginManager {
-    static let label = "com.user.LogitechPreciseVolumeRoller"
+    static let label = "com.satanski.LogitechPreciseVolumeRoller"
     static let plistPath = ("~/Library/LaunchAgents/\(label).plist" as NSString).expandingTildeInPath
     
     static var isEnabled: Bool {
