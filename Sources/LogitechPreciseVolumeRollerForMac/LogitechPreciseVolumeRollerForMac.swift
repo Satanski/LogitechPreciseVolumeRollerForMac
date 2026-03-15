@@ -98,6 +98,8 @@ class VolumeRollerController: NSObject {
     // Tap reference for re-enabling
     private var eventTap: CFMachPort?
 
+    private var heartbeatTimer: Timer?
+
     func start() {
         setupMenuBar()
         AppLogger.log("Starting Precise Volume Roller (CGEventTap)...")
@@ -116,10 +118,42 @@ class VolumeRollerController: NSObject {
         if !trusted {
             AppLogger.log("⚠️ Brak uprawnień Accessibility.")
             AppLogger.log("   Przejdź do: Ustawienia systemowe → Prywatność i bezpieczeństwo → Dostępność")
-            AppLogger.log("   Usuń starą wersję, dodaj nową i uruchom ponownie.")
+            AppLogger.log("   Zaznacz przełącznik przy aplikacji.")
         } else {
             AppLogger.log("✅ Uprawnienia Accessibility OK.")
+            setupEventTap()
         }
+
+        // Heartbeat check for permissions
+        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkPermissionsHeartbeat()
+            }
+        }
+    }
+
+    private func checkPermissionsHeartbeat() {
+        let isTrusted = AXIsProcessTrusted()
+        
+        // If we have tap, it means we were already running
+        if self.eventTap != nil {
+            if !isTrusted {
+                AppLogger.log("❌ Heartbeat: Wykryto brak uprawnień Accessibility. Zamykanie aplikacji.")
+                DispatchQueue.main.async {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
+        } else {
+            // We don't have tap, waiting for permissions
+            if isTrusted {
+                AppLogger.log("✅ Heartbeat: Przyznano uprawnienia Accessibility. Uruchamianie tap...")
+                self.setupEventTap()
+            }
+        }
+    }
+
+    private func setupEventTap() {
+        if self.eventTap != nil { return } // Already set up
 
         // CGEventTap przechwytuje zdarzenia systemowe (NX_SYSDEFINED = media keys)
         guard let tap = CGEvent.tapCreate(
@@ -144,16 +178,6 @@ class VolumeRollerController: NSObject {
         CGEvent.tapEnable(tap: tap, enable: true)
 
         AppLogger.log("🎛️ Nasłuchiwanie aktywne.")
-
-        // Heartbeat check for permissions
-        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
-            if !AXIsProcessTrusted() {
-                AppLogger.log("❌ Heartbeat: Wykryto brak uprawnień Accessibility. Zamykanie aplikacji.")
-                DispatchQueue.main.async {
-                    NSApplication.shared.terminate(nil)
-                }
-            }
-        }
     }
 
     @objc private func refreshMenuBarNotification() {
