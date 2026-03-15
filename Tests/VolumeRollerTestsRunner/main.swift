@@ -1,4 +1,5 @@
 import Foundation
+import LogitechPreciseVolumeRoller
 
 // Prosty mini-framework do testowania, aby pominąć problem z brakiem XCTest w samym Command Line Tools na tym macOS
 

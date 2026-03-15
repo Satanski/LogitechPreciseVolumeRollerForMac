@@ -8,14 +8,25 @@ let package = Package(
     platforms: [
         .macOS(.v11)
     ],
+    products: [
+        .library(name: "LogitechPreciseVolumeRoller", targets: ["LogitechPreciseVolumeRoller"])
+    ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
-        .executableTarget(
-            name: "LogitechPreciseVolumeRollerForMac"
+        // Core logic module
+        .target(
+            name: "LogitechPreciseVolumeRoller",
+            path: "Sources/LogitechPreciseVolumeRoller"
         ),
+        // Main App
+        .executableTarget(
+            name: "LogitechPreciseVolumeRollerForMac",
+            dependencies: ["LogitechPreciseVolumeRoller"],
+            path: "Sources/LogitechPreciseVolumeRollerApp"
+        ),
+        // Test runner
         .executableTarget(
             name: "VolumeRollerTestsRunner",
+            dependencies: ["LogitechPreciseVolumeRoller"],
             path: "Tests/VolumeRollerTestsRunner"
         )
     ]

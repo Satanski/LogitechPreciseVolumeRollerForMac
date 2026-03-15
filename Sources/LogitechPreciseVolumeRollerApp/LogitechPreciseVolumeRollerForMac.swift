@@ -1,6 +1,7 @@
 import Foundation
 import Cocoa
 import CoreGraphics
+import LogitechPreciseVolumeRoller
 
 @main
 @MainActor
@@ -346,7 +347,7 @@ class VolumeRollerController: NSObject {
 
 class SettingsWindowController: NSWindowController {
     convenience init() {
-        let contentRect = NSRect(x: 0, y: 0, width: 320, height: 180)
+        let contentRect = NSRect(x: 0, y: 0, width: 360, height: 220)
         let window = NSWindow(
             contentRect: contentRect,
             styleMask: [.titled, .closable, .fullSizeContentView],
@@ -368,23 +369,23 @@ class SettingsWindowController: NSWindowController {
         
         let titleLabel = NSTextField(labelWithString: "Logitech Precise Volume Roller")
         titleLabel.font = NSFont.boldSystemFont(ofSize: 14)
-        titleLabel.frame = NSRect(x: 20, y: 130, width: 280, height: 20)
+        titleLabel.frame = NSRect(x: 20, y: 165, width: 320, height: 25)
         contentView.addSubview(titleLabel)
         
         let iconCheckbox = NSButton(checkboxWithTitle: "Show icon in menu bar", target: nil, action: #selector(toggleIcon))
-        iconCheckbox.frame = NSRect(x: 20, y: 90, width: 280, height: 20)
+        iconCheckbox.frame = NSRect(x: 20, y: 125, width: 320, height: 20)
         iconCheckbox.state = SettingsManager.isMenuBarIconHidden ? .off : .on
         iconCheckbox.target = self
         contentView.addSubview(iconCheckbox)
         
         let launchCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: #selector(toggleLaunch))
-        launchCheckbox.frame = NSRect(x: 20, y: 60, width: 280, height: 20)
+        launchCheckbox.frame = NSRect(x: 20, y: 95, width: 320, height: 20)
         launchCheckbox.state = LaunchAtLoginManager.isEnabled ? .on : .off
         launchCheckbox.target = self
         contentView.addSubview(launchCheckbox)
 
         let debugCheckbox = NSButton(checkboxWithTitle: "Enable debug logging", target: nil, action: #selector(toggleDebug))
-        debugCheckbox.frame = NSRect(x: 20, y: 35, width: 280, height: 20)
+        debugCheckbox.frame = NSRect(x: 20, y: 65, width: 320, height: 20)
         debugCheckbox.state = SettingsManager.isDebugLoggingEnabled ? .on : .off
         debugCheckbox.target = self
         debugCheckbox.identifier = NSUserInterfaceItemIdentifier("DebugCheckbox")
@@ -393,7 +394,9 @@ class SettingsWindowController: NSWindowController {
         let infoLabel = NSTextField(labelWithString: "The app runs in the background to improve volume control.")
         infoLabel.font = NSFont.systemFont(ofSize: 11)
         infoLabel.textColor = .secondaryLabelColor
-        infoLabel.frame = NSRect(x: 20, y: 5, width: 280, height: 30)
+        infoLabel.frame = NSRect(x: 20, y: 15, width: 320, height: 40)
+        infoLabel.lineBreakMode = .byWordWrapping
+        infoLabel.usesSingleLineMode = false
         contentView.addSubview(infoLabel)
 
         DistributedNotificationCenter.default().addObserver(
