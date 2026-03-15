@@ -14,5 +14,9 @@ let package = Package(
         .executableTarget(
             name: "LogitechPreciseVolumeRollerForMac"
         ),
+        .executableTarget(
+            name: "VolumeRollerTestsRunner",
+            path: "Tests/VolumeRollerTestsRunner"
+        )
     ]
 )

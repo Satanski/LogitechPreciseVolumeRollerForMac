@@ -84,17 +84,9 @@ class VolumeRollerController: NSObject {
     // Menu Bar
     private var statusItem: NSStatusItem?
 
-    // Debounce
-    private var lastEventTime: TimeInterval = 0
-    private let debounceInterval: TimeInterval = 0.03
+    // Logika kółka
+    private let eventProcessor = VolumeEventProcessor()
 
-    // Direction Lock
-    private var lastDirection: Bool? = nil
-    private var lastDirectionTime: TimeInterval = 0
-    private let directionLockWindow: TimeInterval = 0.30
-    private var pendingNewDirectionCount = 0
-    private let directionConfirmCount = 2
-    
     // Tap reference for re-enabling
     private var eventTap: CFMachPort?
 
@@ -309,7 +301,10 @@ class VolumeRollerController: NSObject {
             
             if isDown {
                 let isUp = (keyCode == 0)
-                if processVolumeEvent(isUp: isUp) {
+                // Użycie wyizolowanego procesora do zadecydowania czy wykonamy akcję, z podaniem twardego czasu:
+                let now = Date().timeIntervalSince1970
+                if eventProcessor.processVolumeEvent(isUp: isUp, currentTime: now) {
+                    AppLogger.log("🎚️ \(isUp ? "↑" : "↓") (1/4 notch)", level: .debug)
                     simulateMediaKey(keyCode: keyCode, withOptionShift: true)
                     return nil
                 }
@@ -322,26 +317,6 @@ class VolumeRollerController: NSObject {
         default:
             return Unmanaged.passUnretained(event)
         }
-    }
-
-    private func processVolumeEvent(isUp: Bool) -> Bool {
-        let now = Date().timeIntervalSince1970
-        guard now - lastEventTime > debounceInterval else { return false }
-
-        if let dir = lastDirection, now - lastDirectionTime < directionLockWindow, dir != isUp {
-            pendingNewDirectionCount += 1
-            if pendingNewDirectionCount < directionConfirmCount { return false }
-            pendingNewDirectionCount = 0
-        } else if lastDirection != nil {
-            pendingNewDirectionCount = 0
-        }
-
-        lastEventTime = now
-        lastDirection = isUp
-        lastDirectionTime = now
-
-        AppLogger.log("🎚️ \(isUp ? "↑" : "↓") (1/4 notch)", level: .debug)
-        return true
     }
 
     private func simulateMediaKey(keyCode: Int32, withOptionShift: Bool = false) {
