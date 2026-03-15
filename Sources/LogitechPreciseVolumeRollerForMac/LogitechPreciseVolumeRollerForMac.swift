@@ -194,15 +194,22 @@ class VolumeRollerController: NSObject {
         menu.addItem(NSMenuItem(title: "Logitech Precise Volume Roller", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         
+        let iconItem = NSMenuItem(title: "Show icon in menu bar", action: #selector(toggleIcon), keyEquivalent: "")
+        iconItem.target = self
+        iconItem.state = SettingsManager.isMenuBarIconHidden ? .off : .on
+        menu.addItem(iconItem)
+        
+        let launchItem = NSMenuItem(title: "Launch at login", action: #selector(toggleLaunch), keyEquivalent: "")
+        launchItem.target = self
+        launchItem.state = LaunchAtLoginManager.isEnabled ? .on : .off
+        menu.addItem(launchItem)
+        
+        menu.addItem(NSMenuItem.separator())
+
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
         
-        let debugItem = NSMenuItem(title: "Debug Logging", action: #selector(toggleDebugLogging), keyEquivalent: "")
-        debugItem.target = self
-        debugItem.state = SettingsManager.isDebugLoggingEnabled ? .on : .off
-        menu.addItem(debugItem)
-
         menu.addItem(NSMenuItem.separator())
         let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
@@ -210,8 +217,19 @@ class VolumeRollerController: NSObject {
         statusItem?.menu = menu
     }
 
-    @objc private func toggleDebugLogging() {
-        SettingsManager.isDebugLoggingEnabled.toggle()
+    @objc private func toggleIcon() {
+        SettingsManager.isMenuBarIconHidden.toggle()
+        setupMenuBar()
+        
+        // Notify settings window if open
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.satanski.LogitechPreciseVolumeRoller.RefreshSettings"),
+            object: nil
+        )
+    }
+
+    @objc private func toggleLaunch() {
+        LaunchAtLoginManager.isEnabled.toggle()
         updateMenu()
         
         // Notify settings window if open
@@ -390,8 +408,17 @@ class SettingsWindowController: NSWindowController {
     @objc func refreshSettings() {
         if let contentView = window?.contentView {
             for subview in contentView.subviews {
-                if let checkbox = subview as? NSButton, checkbox.identifier?.rawValue == "DebugCheckbox" {
-                    checkbox.state = SettingsManager.isDebugLoggingEnabled ? .on : .off
+                if let checkbox = subview as? NSButton {
+                    switch checkbox.title {
+                    case "Show icon in menu bar":
+                        checkbox.state = SettingsManager.isMenuBarIconHidden ? .off : .on
+                    case "Launch at login":
+                        checkbox.state = LaunchAtLoginManager.isEnabled ? .on : .off
+                    case "Enable debug logging":
+                        checkbox.state = SettingsManager.isDebugLoggingEnabled ? .on : .off
+                    default:
+                        break
+                    }
                 }
             }
         }
