@@ -9,6 +9,10 @@ BUNDLE_ID="com.satanski.LogitechPreciseVolumeRoller"
 EXECUTABLE_NAME="LogitechPreciseVolumeRollerForMac"
 BUNDLE_DIR="${APP_NAME}.app"
 
+# Resolve version from the latest git tag (falls back to 'dev' if no tag exists)
+VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+echo "🏷️  Version: $VERSION"
+
 echo "🔨 Building Logitech Precise Volume Roller in Release mode..."
 swift build -c release
 
@@ -56,8 +60,9 @@ fi
 echo "✍️  Ad-hoc signing the app bundle..."
 codesign --force --deep -s - "$BUNDLE_DIR" || { echo "❌ Signing failed"; exit 1; }
 
-# Create ZIP
-ZIP_NAME="${APP_NAME}.zip"
+# Create ZIP — use dots in the base name and append the version tag
+ZIP_BASENAME=$(echo "$APP_NAME" | tr ' ' '.')
+ZIP_NAME="${ZIP_BASENAME}-${VERSION}.zip"
 echo "📦 Creating ZIP archive: $ZIP_NAME..."
 rm -f "$ZIP_NAME"
 # Use -r for recursive and -y to preserve symlinks
