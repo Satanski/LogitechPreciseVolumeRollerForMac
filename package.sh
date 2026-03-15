@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exit on error
+set -e
+
 # Configuration
 APP_NAME="Logitech Precise Volume Roller"
 BUNDLE_ID="com.satanski.LogitechPreciseVolumeRoller"
@@ -17,16 +20,28 @@ mkdir -p "$BUNDLE_DIR/Contents/Resources"
 
 # Copy binary
 echo "🚀 Copying binary..."
-cp ".build/release/$EXECUTABLE_NAME" "$BUNDLE_DIR/Contents/MacOS/"
+BINARY_SOURCE=$(swift build -c release --show-bin-path)/$EXECUTABLE_NAME
+if [ ! -f "$BINARY_SOURCE" ]; then
+    echo "❌ Binary not found at $BINARY_SOURCE"
+    exit 1
+fi
+
+cp "$BINARY_SOURCE" "$BUNDLE_DIR/Contents/MacOS/"
+chmod +x "$BUNDLE_DIR/Contents/MacOS/$EXECUTABLE_NAME"
 
 # Copy Info.plist
 echo "📄 Copying Info.plist..."
 cp "Resources/Info.plist" "$BUNDLE_DIR/Contents/"
 
+# Create PkgInfo
+echo "APPL????" > "$BUNDLE_DIR/Contents/PkgInfo"
+
 # Generate icon if needed
 if [ -f "Resources/icon.png" ]; then
-    if [ ! -f "Resources/AppIcon.icns" ] || [ "Resources/icon.png" -nt "Resources/AppIcon.icns" ]; then
+    # Improved check for CI environments
+    if [ ! -f "Resources/AppIcon.icns" ] || [ "Resources/icon.png" -nt "Resources/AppIcon.icns" ] || [ "$CI" == "true" ]; then
         echo "🎨 Generating AppIcon.icns from icon.png..."
+        chmod +x Resources/generate_icns.sh
         ./Resources/generate_icns.sh
     fi
 fi
@@ -45,8 +60,9 @@ codesign --force --deep -s - "$BUNDLE_DIR" || { echo "❌ Signing failed"; exit 
 ZIP_NAME="${APP_NAME}.zip"
 echo "📦 Creating ZIP archive: $ZIP_NAME..."
 rm -f "$ZIP_NAME"
-zip -r9 "$ZIP_NAME" "$BUNDLE_DIR" > /dev/null
+# Use -r for recursive and -y to preserve symlinks
+zip -ry9 "$ZIP_NAME" "$BUNDLE_DIR" > /dev/null
 
 echo "✅ Done! Application bundled in $BUNDLE_DIR"
 echo "📦 Distributable archive created: $ZIP_NAME"
-echo "👉 You can now move $BUNDLE_DIR to your /Applications folder or share $ZIP_NAME."
+

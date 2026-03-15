@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exit on error
+set -e
+
 # This script generates a multi-resolution AppIcon.icns from a source PNG file.
 # It uses Apple's 'sips' for resizing and 'iconutil' for packing.
 
@@ -8,12 +11,13 @@ ICONSET_DIR="Resources/AppIcon.iconset"
 OUTPUT_ICNS="Resources/AppIcon.icns"
 
 if [ ! -f "$SRC_PNG" ]; then
-    echo "Error: $SRC_PNG not found."
+    echo "❌ Error: $SRC_PNG not found."
     exit 1
 fi
 
 echo "🎨 Generating iconset from $SRC_PNG..."
 
+rm -rf "$ICONSET_DIR"
 mkdir -p "$ICONSET_DIR"
 
 # Standard sizes
@@ -38,3 +42,4 @@ else
     echo "❌ Failed to create $OUTPUT_ICNS"
     exit 1
 fi
+
