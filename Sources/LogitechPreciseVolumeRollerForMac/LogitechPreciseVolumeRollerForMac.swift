@@ -80,7 +80,7 @@ class PreciseVolumeRollerApp: NSObject, NSApplicationDelegate {
 }
 
 @MainActor
-class VolumeRollerController {
+class VolumeRollerController: NSObject {
     // Menu Bar
     private var statusItem: NSStatusItem?
 
@@ -194,12 +194,31 @@ class VolumeRollerController {
         menu.addItem(NSMenuItem(title: "Logitech Precise Volume Roller", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         
-        menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         
+        let debugItem = NSMenuItem(title: "Debug Logging", action: #selector(toggleDebugLogging), keyEquivalent: "")
+        debugItem.target = self
+        debugItem.state = SettingsManager.isDebugLoggingEnabled ? .on : .off
+        menu.addItem(debugItem)
+
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(quitItem)
         
         statusItem?.menu = menu
+    }
+
+    @objc private func toggleDebugLogging() {
+        SettingsManager.isDebugLoggingEnabled.toggle()
+        updateMenu()
+        
+        // Notify settings window if open
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.satanski.LogitechPreciseVolumeRoller.RefreshSettings"),
+            object: nil
+        )
     }
 
     @objc private func openSettings() {
@@ -279,7 +298,7 @@ class VolumeRollerController {
         lastDirection = isUp
         lastDirectionTime = now
 
-        AppLogger.log("🎚️ \(isUp ? "↑" : "↓") (1/4 notch)")
+        AppLogger.log("🎚️ \(isUp ? "↑" : "↓") (1/4 notch)", level: .debug)
         return true
     }
 
@@ -346,12 +365,44 @@ class SettingsWindowController: NSWindowController {
         launchCheckbox.state = LaunchAtLoginManager.isEnabled ? .on : .off
         launchCheckbox.target = self
         contentView.addSubview(launchCheckbox)
+
+        let debugCheckbox = NSButton(checkboxWithTitle: "Enable debug logging", target: nil, action: #selector(toggleDebug))
+        debugCheckbox.frame = NSRect(x: 20, y: 35, width: 280, height: 20)
+        debugCheckbox.state = SettingsManager.isDebugLoggingEnabled ? .on : .off
+        debugCheckbox.target = self
+        debugCheckbox.identifier = NSUserInterfaceItemIdentifier("DebugCheckbox")
+        contentView.addSubview(debugCheckbox)
         
         let infoLabel = NSTextField(labelWithString: "The app runs in the background to improve volume control.")
         infoLabel.font = NSFont.systemFont(ofSize: 11)
         infoLabel.textColor = .secondaryLabelColor
-        infoLabel.frame = NSRect(x: 20, y: 20, width: 280, height: 30)
+        infoLabel.frame = NSRect(x: 20, y: 5, width: 280, height: 30)
         contentView.addSubview(infoLabel)
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(refreshSettings),
+            name: Notification.Name("com.satanski.LogitechPreciseVolumeRoller.RefreshSettings"),
+            object: nil
+        )
+    }
+    
+    @objc func refreshSettings() {
+        if let contentView = window?.contentView {
+            for subview in contentView.subviews {
+                if let checkbox = subview as? NSButton, checkbox.identifier?.rawValue == "DebugCheckbox" {
+                    checkbox.state = SettingsManager.isDebugLoggingEnabled ? .on : .off
+                }
+            }
+        }
+    }
+
+    @objc func toggleDebug(_ sender: NSButton) {
+        SettingsManager.isDebugLoggingEnabled = (sender.state == .on)
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.satanski.LogitechPreciseVolumeRoller.RefreshMenuBar"),
+            object: nil
+        )
     }
     
     @objc func toggleIcon(_ sender: NSButton) {
@@ -405,23 +456,41 @@ class LaunchAtLoginManager {
 }
 
 class AppLogger {
+    enum LogLevel {
+        case info
+        case debug
+    }
+
     private static let logQueue = DispatchQueue(label: "com.satanski.LogitechPreciseVolumeRoller.LogQueue")
+    private static let maxLogSize = 1024 * 1024 // 1MB
     
-    static func log(_ message: String) {
-        let logMessage = "[\(Date().description)] \(message)\n"
+    static func log(_ message: String, level: LogLevel = .info) {
+        if level == .debug && !SettingsManager.isDebugLoggingEnabled {
+            return
+        }
+
+        let logMessage = "[\(Date().description)] [\(level == .info ? "INFO" : "DEBUG")] \(message)\n"
         print(message)
         
         logQueue.async {
             let logPath = ("~/Library/Logs/PreciseVolumeRoller.log" as NSString).expandingTildeInPath
+            let url = URL(fileURLWithPath: logPath)
+            
+            // Check size and rotate if necessary
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: logPath),
+               let size = attrs[.size] as? UInt64, size > maxLogSize {
+                try? FileManager.default.removeItem(atPath: logPath)
+            }
+
             if let data = logMessage.data(using: .utf8) {
                 if FileManager.default.fileExists(atPath: logPath) {
-                    if let fileHandle = FileHandle(forWritingAtPath: logPath) {
+                    if let fileHandle = try? FileHandle(forWritingTo: url) {
                         fileHandle.seekToEndOfFile()
                         fileHandle.write(data)
                         try? fileHandle.close()
                     }
                 } else {
-                    try? data.write(to: URL(fileURLWithPath: logPath))
+                    try? data.write(to: url)
                 }
             }
         }
@@ -430,8 +499,15 @@ class AppLogger {
 
 class SettingsManager {
     static let hideIconKey = "hideMenuBarIcon"
+    static let debugLoggingKey = "enableDebugLogging"
+
     static var isMenuBarIconHidden: Bool {
         get { UserDefaults.standard.bool(forKey: hideIconKey) }
         set { UserDefaults.standard.set(newValue, forKey: hideIconKey) }
+    }
+
+    static var isDebugLoggingEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: debugLoggingKey) }
+        set { UserDefaults.standard.set(newValue, forKey: debugLoggingKey) }
     }
 }
