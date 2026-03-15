@@ -37,17 +37,18 @@ Then move the generated `LogitechPreciseVolumeRoller.app` to your `/Applications
 
 Because this app is not signed with an Apple Developer certificate, macOS Gatekeeper may block it with a message like *"Logitech Precise Volume Roller" can't be opened because Apple cannot check it for malicious software.*
 
-**To open it anyway:**
-1.  **Right-click** (or Control-click) the `.app` file.
-2.  Select **Open** from the context menu.
-3.  Click **Open** in the confirmation dialog.
+**Method 1 — Right-click to open:**
+1. **Right-click** (or Control-click) the `.app` file.
+2. Select **Open** from the context menu.
+3. Click **Open** in the confirmation dialog.
 
-Alternatively, you can remove the quarantine flag via Terminal:
-```sh
-xattr -cr "/Applications/Logitech Precise Volume Roller.app"
-```
+**Method 2 — Via System Settings** (if Method 1 doesn't show an Open button):
+1. Try to open the app normally — it will be blocked.
+2. Go to **Apple menu** () **→ System Settings → Privacy & Security**.
+3. Scroll down to the **Security** section and click **Open Anyway**.
+4. Enter your login password and click **OK**.
 
-This is a one-time step — the app will launch normally on all subsequent opens.
+This is a one-time step — afterwards the app opens normally like any other.
 
 ## 🛠 Permissions
 This app requires **Accessibility** permissions to intercept and modify volume key events.
