@@ -16,9 +16,13 @@ On macOS, the Logitech G915 volume roller often scrolls much too fast or jumps e
 
 ### Option 1: Direct Download (Recommended)
 1.  Go to the [Releases](https://github.com/Satanski/LogitechPreciseVolumeRollerForMac/releases) page.
-2.  Download the latest `LogitechPreciseVolumeRoller.zip`.
-3.  Unzip and move `LogitechPreciseVolumeRoller.app` to your `/Applications` folder.
-4.  Open the app.
+2.  Download the latest `Logitech Precise Volume Roller.zip`.
+3.  Unzip and move `Logitech Precise Volume Roller.app` to your `/Applications` folder.
+4.  **Right-click** (or Control-click) the app and choose **Open**.
+5.  In the dialog that appears, click **Open** again to confirm.
+
+> [!NOTE]
+> You only need to do this once. After the first launch, the app will open normally like any other app.
 
 ### Option 2: Build from Source
 If you have Swift and Xcode installed:
@@ -28,6 +32,22 @@ cd LogitechPreciseVolumeRollerForMac
 ./package.sh
 ```
 Then move the generated `LogitechPreciseVolumeRoller.app` to your `/Applications` folder.
+
+## 🔒 macOS Security Warning
+
+Because this app is not signed with an Apple Developer certificate, macOS Gatekeeper may block it with a message like *"Logitech Precise Volume Roller" can't be opened because Apple cannot check it for malicious software.*
+
+**To open it anyway:**
+1.  **Right-click** (or Control-click) the `.app` file.
+2.  Select **Open** from the context menu.
+3.  Click **Open** in the confirmation dialog.
+
+Alternatively, you can remove the quarantine flag via Terminal:
+```sh
+xattr -cr "/Applications/Logitech Precise Volume Roller.app"
+```
+
+This is a one-time step — the app will launch normally on all subsequent opens.
 
 ## 🛠 Permissions
 This app requires **Accessibility** permissions to intercept and modify volume key events.
