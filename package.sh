@@ -23,10 +23,18 @@ cp ".build/release/$EXECUTABLE_NAME" "$BUNDLE_DIR/Contents/MacOS/"
 echo "📄 Copying Info.plist..."
 cp "Resources/Info.plist" "$BUNDLE_DIR/Contents/"
 
-# Copy Resources (icon if exists)
+# Generate icon if needed
 if [ -f "Resources/icon.png" ]; then
-    echo "🖼️ Copying icon.png..."
-    cp "Resources/icon.png" "$BUNDLE_DIR/Contents/Resources/"
+    if [ ! -f "Resources/AppIcon.icns" ] || [ "Resources/icon.png" -nt "Resources/AppIcon.icns" ]; then
+        echo "🎨 Generating AppIcon.icns from icon.png..."
+        ./Resources/generate_icns.sh
+    fi
+fi
+
+# Copy Resources
+if [ -f "Resources/AppIcon.icns" ]; then
+    echo "🖼️ Copying AppIcon.icns..."
+    cp "Resources/AppIcon.icns" "$BUNDLE_DIR/Contents/Resources/"
 fi
 
 # Sign the bundle
