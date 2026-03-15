@@ -144,6 +144,16 @@ class VolumeRollerController {
         CGEvent.tapEnable(tap: tap, enable: true)
 
         AppLogger.log("🎛️ Nasłuchiwanie aktywne.")
+
+        // Heartbeat check for permissions
+        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            if !AXIsProcessTrusted() {
+                AppLogger.log("❌ Heartbeat: Wykryto brak uprawnień Accessibility. Zamykanie aplikacji.")
+                DispatchQueue.main.async {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
+        }
     }
 
     @objc private func refreshMenuBarNotification() {
@@ -200,9 +210,20 @@ class VolumeRollerController {
 
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            AppLogger.log("⚠️ Event tap disabled (\(type.rawValue)). Re-enabling...")
-            if let tap = self.eventTap {
-                CGEvent.tapEnable(tap: tap, enable: true)
+            AppLogger.log("⚠️ Event tap disabled (\(type.rawValue)). Sprawdzenie uprawnień...")
+            
+            // Sprawdzamy czy nadal mamy uprawnienia. 
+            // Jeśli nie, natychmiast kończymy pracę, aby nie blokować kolejki zdarzeń systemu.
+            if AXIsProcessTrusted() {
+                AppLogger.log("✅ Uprawnienia OK, ponowna aktywacja tapu.")
+                if let tap = self.eventTap {
+                    CGEvent.tapEnable(tap: tap, enable: true)
+                }
+            } else {
+                AppLogger.log("❌ Brak uprawnień Accessibility. Zamykanie aplikacji dla bezpieczeństwa systemu.")
+                DispatchQueue.main.async {
+                    NSApplication.shared.terminate(nil)
+                }
             }
             return Unmanaged.passUnretained(event)
         }
@@ -384,19 +405,24 @@ class LaunchAtLoginManager {
 }
 
 class AppLogger {
+    private static let logQueue = DispatchQueue(label: "com.satanski.LogitechPreciseVolumeRoller.LogQueue")
+    
     static func log(_ message: String) {
-        let logPath = ("~/Library/Logs/PreciseVolumeRoller.log" as NSString).expandingTildeInPath
         let logMessage = "[\(Date().description)] \(message)\n"
         print(message)
-        if let data = logMessage.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: logPath) {
-                if let fileHandle = FileHandle(forWritingAtPath: logPath) {
-                    fileHandle.seekToEndOfFile()
-                    fileHandle.write(data)
-                    try? fileHandle.close()
+        
+        logQueue.async {
+            let logPath = ("~/Library/Logs/PreciseVolumeRoller.log" as NSString).expandingTildeInPath
+            if let data = logMessage.data(using: .utf8) {
+                if FileManager.default.fileExists(atPath: logPath) {
+                    if let fileHandle = FileHandle(forWritingAtPath: logPath) {
+                        fileHandle.seekToEndOfFile()
+                        fileHandle.write(data)
+                        try? fileHandle.close()
+                    }
+                } else {
+                    try? data.write(to: URL(fileURLWithPath: logPath))
                 }
-            } else {
-                try? data.write(to: URL(fileURLWithPath: logPath))
             }
         }
     }
